@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  bms_app:
+    build: .
+    image: svsps/bms-app:v1.0.0
+    container_name: bms-container
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/vegetable_order_app
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
