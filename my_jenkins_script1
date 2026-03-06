@@ -1,0 +1,103 @@
+pipeline {
+    agent any
+
+    tools {
+        nodejs 'nodejs25'
+    }
+
+    stages {
+
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'feature', url: 'https://github.com/svspSahil/Book-My-Show.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                dir('bookmyshow-app') {
+                    sh 'npm install'
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir('bookmyshow-app') {
+                    withSonarQubeEnv('sonar-server') {
+                        script {
+                            sh """
+                            ${tool 'sonar-scanner'}/bin/sonar-scanner \
+                            -Dsonar.projectKey=Bookmyshow \
+                            -Dsonar.sources=. \
+                            -Dsonar.exclusions=node_modules/**
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir('bookmyshow-app') {
+                    sh 'docker build -t bookmyshow-app .'
+                }
+            }
+        }
+
+        stage('Run Docker Container') {
+            steps {
+                sh '''
+                docker rm -f bookmyshow-container || true
+                docker run -d -p 3000:3000 --name bookmyshow-container bookmyshow-app
+                '''
+            }
+        }
+    }
+
+    post {
+
+        success {
+            emailext(
+                subject: "Jenkins Build SUCCESS",
+                body: """
+Pipeline executed successfully.
+
+Project: BookMyShow
+Build Number: ${env.BUILD_NUMBER}
+Job: ${env.JOB_NAME}
+
+Application deployed successfully.
+""",
+                to: "pavansahil.y@gmail.com"
+            )
+        }
+
+        failure {
+            emailext(
+                subject: "Jenkins Build FAILED",
+                body: """
+Pipeline execution FAILED.
+
+Project: BookMyShow
+Build Number: ${env.BUILD_NUMBER}
+Job: ${env.JOB_NAME}
+
+Check Jenkins console logs.
+""",
+                to: "pavansahil.y@gmail.com"
+            )
+        }
+
+        always {
+            echo "Pipeline finished."
+        }
+    }
+}
